@@ -1,0 +1,218 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f5f7fb">
+    <title>Dashboard financeiro | Finance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <script src="{% static 'js/dashboard.js' %}" defer></script>
+</head>
+<body class="dashboard-page">
+    <main class="dashboard-shell">
+        <header class="dashboard-header">
+            <a class="brand dashboard-brand" href="{% url 'Control' %}" aria-label="Finance, início">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 32 32" fill="none">
+                        <path d="M7 22.5 13 16l4 3.5 8-10" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M19.5 9.5H25v5.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+                <span>Finance<span class="brand-period">.</span></span>
+            </a>
+            <div class="header-user">
+                <span class="user-avatar">{{ request.user.username|first|upper }}</span>
+                <span class="user-name">{{ request.user.username }}</span>
+                <span class="admin-badge">ADMIN</span>
+            </div>
+        </header>
+
+        <section class="dashboard-intro">
+            <div>
+                <p class="eyebrow">VISÃO GERAL</p>
+                <h1>Dashboard financeiro</h1>
+                <p class="dashboard-subtitle">Acompanhe a saúde financeira do seu negócio.</p>
+            </div>
+            <div class="current-date">
+                <span class="date-dot"></span>
+                {{ today|date:"d \\d\\e F \\d\\e Y" }}
+            </div>
+        </section>
+
+        {% if messages %}
+            <div class="dashboard-messages" aria-live="polite">
+                {% for message in messages %}
+                    <p class="dashboard-message {{ message.tags }}">{{ message }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <section class="summary-grid" aria-label="Resumo financeiro">
+            <article class="summary-card balance-card">
+                <div class="summary-topline">
+                    <span class="summary-label">Saldo atual</span>
+                    <span class="summary-icon balance-icon" aria-hidden="true">$</span>
+                </div>
+                <p class="summary-value">R$ {{ balance|floatformat:2 }}</p>
+                <p class="summary-hint">Receitas menos despesas registradas</p>
+            </article>
+            <article class="summary-card">
+                <div class="summary-topline">
+                    <span class="summary-label">Receitas do mês</span>
+                    <span class="summary-icon income-icon" aria-hidden="true">↗</span>
+                </div>
+                <p class="summary-value">R$ {{ month_income|floatformat:2 }}</p>
+                <p class="summary-hint">No mês atual</p>
+            </article>
+            <article class="summary-card">
+                <div class="summary-topline">
+                    <span class="summary-label">Despesas do mês</span>
+                    <span class="summary-icon expense-icon" aria-hidden="true">↘</span>
+                </div>
+                <p class="summary-value">R$ {{ month_expenses|floatformat:2 }}</p>
+                <p class="summary-hint">No mês atual</p>
+            </article>
+            <article class="summary-card">
+                <div class="summary-topline">
+                    <span class="summary-label">Resultado mensal</span>
+                    <span class="summary-icon result-icon" aria-hidden="true">∑</span>
+                </div>
+                <p class="summary-value {% if month_result < 0 %}negative-value{% endif %}">R$ {{ month_result|floatformat:2 }}</p>
+                <p class="summary-hint">Receitas menos despesas do mês</p>
+            </article>
+        </section>
+
+        <section class="dashboard-content">
+            <article class="panel chart-panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>Receitas vs. despesas</h2>
+                        <p>Movimentação diária do mês atual</p>
+                    </div>
+                    <div class="chart-legend">
+                        <span><i class="legend-dot income-dot"></i>Receitas</span>
+                        <span><i class="legend-dot expense-dot"></i>Despesas</span>
+                    </div>
+                </div>
+                <div class="chart-wrap">
+                    <canvas id="finance-chart" aria-label="Gráfico diário de receitas e despesas do mês"></canvas>
+                </div>
+                <p class="chart-empty" id="chart-empty" hidden>Nenhum lançamento neste mês. Adicione um lançamento para começar.</p>
+                {{ chart_data|json_script:"chart-data" }}
+            </article>
+
+            <article class="panel entry-panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>Novo lançamento</h2>
+                        <p>Registre uma receita ou despesa</p>
+                    </div>
+                    <span class="panel-plus" aria-hidden="true">+</span>
+                </div>
+                <form class="entry-form" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create">
+                    <label for="description">Descrição</label>
+                    <input id="description" name="description" type="text" maxlength="120" placeholder="Ex.: Conta de internet" required>
+                    <div class="form-row">
+                        <div>
+                            <label for="kind">Tipo</label>
+                            <select id="kind" name="kind" required>
+                                <option value="income">Receita</option>
+                                <option value="expense">Despesa</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="amount">Valor (R$)</label>
+                            <input id="amount" name="amount" type="number" min="0.01" step="0.01" placeholder="0,00" required>
+                        </div>
+                    </div>
+                    <label for="date">Data</label>
+                    <input id="date" name="date" type="date" value="{{ entry_date }}" required>
+                    <button class="primary-button" type="submit">Adicionar lançamento <span aria-hidden="true">→</span></button>
+                </form>
+            </article>
+        </section>
+
+        <section class="panel transactions-panel">
+            <div class="panel-heading transactions-heading">
+                <div>
+                    <h2>Lançamentos recentes</h2>
+                    <p>Edite ou remova os registros financeiros</p>
+                </div>
+                <span class="entry-count">{{ recent_entries|length }} registros</span>
+            </div>
+            <div class="table-scroll">
+                <table class="transactions-table">
+                    <thead>
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Tipo</th>
+                            <th>Data</th>
+                            <th>Valor</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in recent_entries %}
+                            <tr>
+                                <td>
+                                    <input class="table-input description-input" form="edit-{{ entry.pk }}" name="description" value="{{ entry.description }}" maxlength="120" aria-label="Descrição" required>
+                                </td>
+                                <td>
+                                    <select class="table-input type-input" form="edit-{{ entry.pk }}" name="kind" aria-label="Tipo">
+                                        <option value="income" {% if entry.kind == 'income' %}selected{% endif %}>Receita</option>
+                                        <option value="expense" {% if entry.kind == 'expense' %}selected{% endif %}>Despesa</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input class="table-input date-input" form="edit-{{ entry.pk }}" name="date" type="date" value="{{ entry.date|date:'Y-m-d' }}" aria-label="Data" required>
+                                </td>
+                                <td>
+                                    <div class="amount-cell {% if entry.kind == 'expense' %}amount-expense{% else %}amount-income{% endif %}">
+                                        <span>{% if entry.kind == 'expense' %}−{% else %}+{% endif %} R$</span>
+                                        <input class="table-input amount-input" form="edit-{{ entry.pk }}" name="amount" type="number" min="0.01" step="0.01" value="{{ entry.amount|stringformat:'.2f' }}" aria-label="Valor" required>
+                                    </div>
+                                </td>
+                                <td class="action-cell">
+                                    <form id="edit-{{ entry.pk }}" method="post">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="update">
+                                        <input type="hidden" name="entry_id" value="{{ entry.pk }}">
+                                    </form>
+                                    <button class="icon-button save-button" type="submit" form="edit-{{ entry.pk }}" aria-label="Salvar alterações de {{ entry.description }}" title="Salvar alterações">
+                                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                            <path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </button>
+                                    <form class="delete-form" method="post" data-confirm-delete>
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="entry_id" value="{{ entry.pk }}">
+                                        <button class="icon-button delete-button" type="submit" aria-label="Excluir {{ entry.description }}" title="Excluir lançamento">
+                                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                <path d="M4 7h16m-10 4v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td class="empty-table" colspan="5">Ainda não há lançamentos. Use o formulário acima para adicionar o primeiro.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <footer class="dashboard-footer">© 2026 Finance <span>·</span> Painel administrativo</footer>
+    </main>
+</body>
+</html>
